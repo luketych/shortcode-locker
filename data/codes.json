@@ -1,0 +1,16 @@
+{
+  "ABC": {
+    "label": "Example website",
+    "value": "https://example.com"
+  },
+  "I2b": {
+    "label": "Example apartment note",
+    "value": "Spare batteries are in the top-left drawer by the entryway.",
+    "kind": "text"
+  },
+  "Z9a": {
+    "label": "Example file/folder URI",
+    "value": "file:///mnt/storage/manuals",
+    "kind": "uri"
+  }
+}

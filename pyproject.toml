@@ -1,0 +1,18 @@
+[project]
+name = "shortcode_locker"
+version = "0.1.0"
+description = "Tiny 3-character shortcut/string resolver for a ZimaBoard"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+shortcode-locker = "app:main"
+shortcode_locker = "app:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["app"]

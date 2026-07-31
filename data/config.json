@@ -1,0 +1,4 @@
+{
+  "alphabet_comment": "3-character codes must use only these characters. Defaults avoid 0/1/O, lowercase l/i/o, and lowercase c/z. Uppercase I is allowed.",
+  "alphabet": "23456789ABCDEFGHIJKLMNPQRSTUVWXYZabdefghjmnqrtuy"
+}

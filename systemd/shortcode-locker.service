@@ -1,0 +1,25 @@
+[Unit]
+Description=shortcode_locker: tiny 3-character shortcut/string resolver
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=shortcode-locker
+Group=shortcode-locker
+WorkingDirectory=/opt/shortcode_locker
+Environment=HOST=0.0.0.0
+Environment=PORT=8765
+Environment=SHORTCODE_LOCKER_DATA=/var/lib/shortcode_locker/codes.json
+EnvironmentFile=-/etc/shortcode_locker.env
+ExecStart=/opt/shortcode_locker/.venv/bin/shortcode-locker serve
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/shortcode_locker
+
+[Install]
+WantedBy=multi-user.target

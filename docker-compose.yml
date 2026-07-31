@@ -1,0 +1,14 @@
+services:
+  shortcode_locker:
+    build: .
+    container_name: shortcode_locker
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./data:/data
+    environment:
+      SHORTCODE_LOCKER_DATA: /data/codes.json
+      PORT: "8765"
+      # Docker Compose reads a local .env file automatically if present.
+      SHORTCODE_LOCKER_TOKEN: ${SHORTCODE_LOCKER_TOKEN:-}
