@@ -36,6 +36,21 @@ class ShortcodeLockerTests(unittest.TestCase):
             self.assertEqual(loaded["I2b"].value, "Shelf note")
             self.assertTrue(json.loads(data.read_text())["ABC"]["value"].startswith("https://"))
 
+    def test_create_generated_entry_returns_a_code_and_persists(self):
+        with tempfile.TemporaryDirectory() as td:
+            data = Path(td) / "codes.json"
+            entry = app.create_generated_entry(
+                value="https://new.example",
+                label="New link",
+                data_path=data,
+                alphabet=app.DEFAULT_ALPHABET,
+            )
+            self.assertEqual(len(entry.code), 3)
+            self.assertEqual(entry.value, "https://new.example")
+            loaded = app.load_entries(data, app.DEFAULT_ALPHABET)
+            self.assertIn(entry.code, loaded)
+            self.assertEqual(loaded[entry.code].label, "New link")
+
 
 if __name__ == "__main__":
     unittest.main()

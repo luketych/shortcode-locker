@@ -21,6 +21,7 @@ import re
 import secrets
 import sys
 import tempfile
+import threading
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -42,6 +43,8 @@ CODE_RE = re.compile(r"^[A-Za-z0-9]{3}$")
 URI_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 UNSAFE_OPEN_SCHEMES = {"javascript", "data", "vbscript"}
 URL_SCHEMES = {"http", "https"}
+MAX_BODY_BYTES = 64 * 1024
+DATA_LOCK = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -202,6 +205,36 @@ def generate_codes(count: int, entries: dict[str, Entry], alphabet: str) -> list
     return generated
 
 
+def normalize_kind(kind: str) -> str:
+    kind = (kind or "auto").lower()
+    if kind not in {"auto", "url", "uri", "text"}:
+        raise ValueError("kind must be auto, url, uri, or text")
+    return kind
+
+
+def create_generated_entry(
+    *,
+    value: str,
+    label: str = "",
+    kind: str = "auto",
+    data_path: Path,
+    alphabet: str,
+) -> Entry:
+    value = str(value or "").strip()
+    if not value:
+        raise ValueError("String is required")
+    label = str(label or "").strip()
+    kind = normalize_kind(kind)
+
+    with DATA_LOCK:
+        entries = load_entries(data_path, alphabet)
+        code = generate_codes(1, entries, alphabet)[0]
+        entry = Entry(code=code, value=value, label=label, kind=kind)
+        entries[code] = entry
+        save_entries(data_path, entries)
+        return entry
+
+
 def json_response(handler: BaseHTTPRequestHandler, status: int, payload: Any) -> None:
     body = json.dumps(payload, indent=2, ensure_ascii=False).encode("utf-8")
     handler.send_response(status)
@@ -242,9 +275,21 @@ def render_page(
     token_value: str = "",
     error: str = "",
     entry: Entry | None = None,
+    created_entry: Entry | None = None,
+    add_error: str = "",
+    new_value: str = "",
+    new_label: str = "",
+    new_kind: str = "auto",
     alphabet: str,
 ) -> str:
     escaped_code = html.escape(code, quote=True)
+    escaped_new_value = html.escape(new_value, quote=False)
+    escaped_new_label = html.escape(new_label, quote=True)
+    try:
+        new_kind = normalize_kind(new_kind) if new_kind else "auto"
+    except ValueError:
+        new_kind = "auto"
+
     token_input = ""
     if token_required:
         token_input = f"""
@@ -264,6 +309,15 @@ def render_page(
     elif entry:
         result_html = render_entry(entry)
 
+    add_result_html = ""
+    if add_error:
+        add_result_html = f'<section class="card error"><strong>{html.escape(add_error)}</strong></section>'
+    elif created_entry:
+        add_result_html = render_created_entry(created_entry)
+
+    def selected(kind: str) -> str:
+        return " selected" if new_kind == kind else ""
+
     sample = "".join(random.choice(alphabet) for _ in range(3)) if alphabet else "ABC"
     return f"""<!doctype html>
 <html lang="en">
@@ -274,21 +328,26 @@ def render_page(
   <style>
     :root {{ color-scheme: light dark; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
     body {{ margin: 0; min-height: 100vh; display: grid; place-items: start center; background: #111827; color: #f9fafb; }}
-    main {{ width: min(720px, calc(100vw - 32px)); margin-top: 8vh; }}
+    main {{ width: min(760px, calc(100vw - 32px)); margin: 6vh 0; }}
     h1 {{ margin-bottom: .25rem; letter-spacing: -.04em; }}
+    h2 {{ margin-top: 0; }}
     p {{ color: #cbd5e1; line-height: 1.5; }}
-    form {{ display: grid; gap: 1rem; grid-template-columns: 1fr; margin: 1.5rem 0; }}
+    form {{ display: grid; gap: 1rem; grid-template-columns: 1fr; margin: 1rem 0 0; }}
     label {{ display: grid; gap: .35rem; color: #cbd5e1; font-size: .95rem; }}
-    input {{ font: inherit; font-size: 1.25rem; padding: .8rem 1rem; border-radius: .8rem; border: 1px solid #475569; background: #0f172a; color: #fff; }}
-    input[name="code"] {{ text-transform: none; letter-spacing: .18em; font-weight: 700; }}
+    input, textarea, select {{ font: inherit; font-size: 1.1rem; padding: .8rem 1rem; border-radius: .8rem; border: 1px solid #475569; background: #0f172a; color: #fff; }}
+    textarea {{ min-height: 7rem; resize: vertical; }}
+    input[name="code"] {{ text-transform: none; letter-spacing: .18em; font-weight: 700; font-size: 1.25rem; }}
     button, .button {{ display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: .75rem; padding: .8rem 1rem; background: #38bdf8; color: #082f49; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }}
     .secondary {{ background: #334155; color: #f8fafc; }}
     .actions {{ display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }}
-    .card {{ border: 1px solid #334155; border-radius: 1rem; padding: 1rem; background: #0f172a; box-shadow: 0 20px 80px rgba(0,0,0,.25); }}
+    .card {{ border: 1px solid #334155; border-radius: 1rem; padding: 1rem; margin: 1rem 0; background: #0f172a; box-shadow: 0 20px 80px rgba(0,0,0,.25); }}
     .error {{ border-color: #f87171; background: #3b0d0d; }}
+    .success {{ border-color: #34d399; background: #052e2b; }}
     .muted {{ color: #cbd5e1; }}
     .value {{ white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1.1rem; }}
+    .code-big {{ display: inline-block; margin: .25rem 0 .75rem; padding: .25rem .65rem; border-radius: .6rem; background: #e0f2fe; color: #082f49; font-weight: 900; font-size: clamp(2rem, 8vw, 4rem); letter-spacing: .16em; }}
     code {{ background: #1f2937; padding: .1rem .35rem; border-radius: .35rem; }}
+    .success code {{ background: #064e3b; }}
     .kind {{ display: inline-block; margin-bottom: .75rem; color: #93c5fd; text-transform: uppercase; letter-spacing: .08em; font-size: .8rem; font-weight: 800; }}
     .hint {{ font-size: .9rem; color: #94a3b8; }}
   </style>
@@ -296,16 +355,48 @@ def render_page(
 <body>
   <main>
     <h1>{APP_NAME}</h1>
-    <p>Enter a 3-character code to resolve it to a URL, URI, or plain note.</p>
-    <form method="get" action="/">
-      <label>
-        Code
-        <input name="code" value="{escaped_code}" maxlength="3" minlength="3" pattern="[A-Za-z0-9]{{3}}" placeholder="{html.escape(sample)}" autofocus />
-      </label>
-      {token_input}
-      <button type="submit">Look up</button>
-    </form>
+    <p>Enter a 3-character code to resolve it, or save a new URL/URI/note and get a generated code back.</p>
+
+    <section class="card">
+      <h2>Look up a code</h2>
+      <form method="get" action="/">
+        <label>
+          Code
+          <input name="code" value="{escaped_code}" maxlength="3" minlength="3" pattern="[A-Za-z0-9]{{3}}" placeholder="{html.escape(sample)}" autofocus />
+        </label>
+        {token_input}
+        <button type="submit">Look up</button>
+      </form>
+    </section>
     {result_html}
+
+    <section class="card">
+      <h2>Add a new string</h2>
+      <p>Paste a URL, URI, file/folder URI, or apartment note. {APP_NAME} will generate a 3-character code for it.</p>
+      {add_result_html}
+      <form method="post" action="/add">
+        <label>
+          String to store
+          <textarea name="value" required placeholder="https://example.com or Spare batteries are in the top-left drawer">{escaped_new_value}</textarea>
+        </label>
+        <label>
+          Optional label
+          <input name="label" value="{escaped_new_label}" placeholder="Example website, Manuals folder, Battery stash" />
+        </label>
+        <label>
+          Kind
+          <select name="kind">
+            <option value="auto"{selected("auto")}>Auto-detect</option>
+            <option value="url"{selected("url")}>URL</option>
+            <option value="uri"{selected("uri")}>URI</option>
+            <option value="text"{selected("text")}>Plain text</option>
+          </select>
+        </label>
+        {token_input}
+        <button type="submit">Save and generate code</button>
+      </form>
+    </section>
+
     <p class="hint">Allowed alphabet is configurable. This server never lists all codes from the web UI.</p>
   </main>
   <script>
@@ -336,6 +427,31 @@ def render_page(
   </script>
 </body>
 </html>"""
+
+
+def render_created_entry(entry: Entry) -> str:
+    payload = entry.to_json()
+    code = payload["code"]
+    value = payload["value"]
+    kind = payload["kind"]
+    label = payload["label"] or "New string"
+    code_for_attr = html.escape(code, quote=True)
+    value_for_attr = html.escape(value, quote=True)
+    lookup_href = f"/?code={quote(code)}"
+
+    return f"""
+<section class="card success">
+  <span class="kind">saved</span>
+  <h2>{html.escape(label)} saved. Your code is:</h2>
+  <div class="code-big">{html.escape(code)}</div>
+  <div class="value">{html.escape(value)}</div>
+  <p class="hint">Detected kind: <strong>{html.escape(kind)}</strong></p>
+  <div class="actions">
+    <button type="button" data-copy="{code_for_attr}" onclick="copyValue(this.dataset.copy)">Copy code</button>
+    <button class="secondary" type="button" data-copy="{value_for_attr}" onclick="copyValue(this.dataset.copy)">Copy string</button>
+    <a class="button secondary" href="{lookup_href}">Look up this code</a>
+  </div>
+</section>"""
 
 
 def render_entry(entry: Entry) -> str:
@@ -423,6 +539,115 @@ def make_handler(data_path: Path, alphabet: str, token: str | None):
                 "text/html; charset=utf-8",
             )
 
+        def do_POST(self) -> None:  # noqa: N802 - stdlib hook
+            parsed = urlparse(self.path)
+            if parsed.path not in {"/add", "/api/add"}:
+                text_response(self, HTTPStatus.NOT_FOUND, "Not found\n", "text/plain; charset=utf-8")
+                return
+
+            try:
+                params = {**parse_qs(parsed.query), **self.read_body_params()}
+            except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                if parsed.path == "/api/add":
+                    json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                else:
+                    text_response(
+                        self,
+                        HTTPStatus.BAD_REQUEST,
+                        render_page(
+                            token_required=bool(token),
+                            add_error=str(exc),
+                            alphabet=alphabet,
+                        ),
+                        "text/html; charset=utf-8",
+                    )
+                return
+
+            if parsed.path == "/api/add":
+                self.handle_api_add(params)
+                return
+            self.handle_web_add(params)
+
+        def read_body_params(self) -> dict[str, list[str]]:
+            raw_length = self.headers.get("Content-Length", "0") or "0"
+            try:
+                length = int(raw_length)
+            except ValueError as exc:
+                raise ValueError("Invalid Content-Length") from exc
+            if length > MAX_BODY_BYTES:
+                raise ValueError(f"Request body is too large; max is {MAX_BODY_BYTES} bytes")
+
+            body = self.rfile.read(length).decode("utf-8") if length else ""
+            content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+            if content_type == "application/json":
+                data = json.loads(body or "{}")
+                if not isinstance(data, dict):
+                    raise ValueError("JSON body must be an object")
+                params: dict[str, list[str]] = {}
+                for key, value in data.items():
+                    if isinstance(value, list):
+                        params[str(key)] = ["" if item is None else str(item) for item in value]
+                    else:
+                        params[str(key)] = ["" if value is None else str(value)]
+                return params
+
+            return parse_qs(body, keep_blank_values=True)
+
+        def handle_web_add(self, params: dict[str, list[str]]) -> None:
+            supplied_token = (params.get("token", [""])[0] or "").strip()
+            value = params.get("value", [""])[0] or ""
+            label = params.get("label", [""])[0] or ""
+            kind = params.get("kind", ["auto"])[0] or "auto"
+            created_entry = None
+            add_error = ""
+
+            if not is_authorized(self, token, params):
+                add_error = "Unauthorized. Check the access token."
+            else:
+                try:
+                    created_entry = create_generated_entry(
+                        value=value,
+                        label=label,
+                        kind=kind,
+                        data_path=data_path,
+                        alphabet=alphabet,
+                    )
+                except (ValueError, OSError, json.JSONDecodeError) as exc:
+                    add_error = str(exc)
+
+            text_response(
+                self,
+                HTTPStatus.OK,
+                render_page(
+                    token_required=bool(token),
+                    token_value=supplied_token,
+                    created_entry=created_entry,
+                    add_error=add_error,
+                    new_value="" if created_entry else value,
+                    new_label="" if created_entry else label,
+                    new_kind="auto" if created_entry else kind,
+                    alphabet=alphabet,
+                ),
+                "text/html; charset=utf-8",
+            )
+
+        def handle_api_add(self, params: dict[str, list[str]]) -> None:
+            if not is_authorized(self, token, params):
+                json_response(self, HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+                return
+            try:
+                entry = create_generated_entry(
+                    value=params.get("value", [""])[0] or "",
+                    label=params.get("label", [""])[0] or "",
+                    kind=params.get("kind", ["auto"])[0] or "auto",
+                    data_path=data_path,
+                    alphabet=alphabet,
+                )
+            except (ValueError, OSError, json.JSONDecodeError) as exc:
+                json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            json_response(self, HTTPStatus.CREATED, entry.to_json())
+
         def handle_api_lookup(self, query: dict[str, list[str]]) -> None:
             if not is_authorized(self, token, query):
                 json_response(self, HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
@@ -497,9 +722,7 @@ def command_add(args: argparse.Namespace) -> int:
     entries = load_entries(data_path, alphabet)
     if code in entries and not args.force:
         raise SystemExit(f"{code} already exists; use --force to replace")
-    kind = args.kind.lower()
-    if kind not in {"auto", "url", "uri", "text"}:
-        raise SystemExit("--kind must be auto, url, uri, or text")
+    kind = normalize_kind(args.kind)
     entries[code] = Entry(code=code, value=args.value, label=args.label or "", kind=kind)
     save_entries(data_path, entries)
     print(json.dumps(entries[code].to_json(), indent=2, ensure_ascii=False))

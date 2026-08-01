@@ -27,6 +27,11 @@ Then open:
 http://<zimaboard-ip>:8765
 ```
 
+The page has both:
+
+- **Look up a code** — enter a 3-character code and get its string back.
+- **Add a new string** — paste a URL/URI/note and get a generated 3-character code back.
+
 Stop/update later:
 
 ```bash
@@ -80,10 +85,33 @@ Web UI:
 http://<zimaboard-ip>:8765
 ```
 
-JSON endpoint:
+The same page lets you look up existing codes and add new strings. When you add a string, `shortcode_locker` saves it and displays the generated 3-character code.
+
+Lookup JSON endpoint:
 
 ```text
 http://<zimaboard-ip>:8765/api/lookup?code=ABC
+```
+
+Add JSON endpoint:
+
+```bash
+curl -X POST 'http://<zimaboard-ip>:8765/api/add' \
+  -H 'Content-Type: application/json' \
+  -d '{"value":"https://example.com","label":"Example","kind":"auto"}'
+```
+
+Response:
+
+```json
+{
+  "code": "Ab2",
+  "label": "Example",
+  "value": "https://example.com",
+  "kind": "url",
+  "scheme": "https",
+  "openable": true
+}
 ```
 
 Health check:
