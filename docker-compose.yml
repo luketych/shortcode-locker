@@ -1,7 +1,7 @@
 services:
-  shortcode_locker:
+  shortcode-locker:
     build: .
-    container_name: shortcode_locker
+    container_name: shortcode-locker
     restart: unless-stopped
     ports:
       - "8765:8765"

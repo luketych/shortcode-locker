@@ -1,4 +1,4 @@
-# shortcode_locker
+# shortcode-locker
 
 A tiny web UI for resolving 3-character codes into strings. Designed for a ZimaBoard running ZimaOS now, with a NixOS path later.
 
@@ -15,8 +15,8 @@ The app uses Python stdlib only and is packaged with [`uv`](https://docs.astral.
 If your ZimaBoard has Docker / Docker Compose:
 
 ```bash
-git clone https://github.com/luketych/shortcode_locker.git
-cd shortcode_locker
+git clone https://github.com/luketych/shortcode-locker.git
+cd shortcode-locker
 cp .env.example .env   # optional; edit it if you want a token
 docker compose up -d --build
 ```
@@ -35,7 +35,7 @@ The page has both:
 Stop/update later:
 
 ```bash
-cd shortcode_locker
+cd shortcode-locker
 git pull
 docker compose up -d --build
 ```
@@ -51,8 +51,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Run from a clone:
 
 ```bash
-git clone https://github.com/luketych/shortcode_locker.git
-cd shortcode_locker
+git clone https://github.com/luketych/shortcode-locker.git
+cd shortcode-locker
 uv run shortcode-locker serve --host 0.0.0.0 --port 8765
 ```
 
@@ -85,7 +85,7 @@ Web UI:
 http://<zimaboard-ip>:8765
 ```
 
-The same page lets you look up existing codes and add new strings. When you add a string, `shortcode_locker` saves it and displays the generated 3-character code.
+The same page lets you look up existing codes and add new strings. When you add a string, `shortcode-locker` saves it and displays the generated 3-character code.
 
 Lookup JSON endpoint:
 
@@ -164,12 +164,12 @@ On a Debian-like ZimaOS host:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
-git clone https://github.com/luketych/shortcode_locker.git
-cd shortcode_locker
+git clone https://github.com/luketych/shortcode-locker.git
+cd shortcode-locker
 sudo env "PATH=$PATH" ./install-systemd.sh
 ```
 
-The installer copies the project to `/opt/shortcode_locker`, runs `uv sync --frozen --no-dev`, and starts:
+The installer copies the project to `/opt/shortcode-locker`, runs `uv sync --frozen --no-dev`, and starts:
 
 ```text
 shortcode-locker.service
@@ -178,20 +178,20 @@ shortcode-locker.service
 Data lives here:
 
 ```text
-/var/lib/shortcode_locker/codes.json
-/var/lib/shortcode_locker/config.json
+/var/lib/shortcode-locker/codes.json
+/var/lib/shortcode-locker/config.json
 ```
 
 Optional token:
 
 ```bash
-sudo sh -c 'printf "SHORTCODE_LOCKER_TOKEN=%s\n" "change-this-token" > /etc/shortcode_locker.env'
+sudo sh -c 'printf "SHORTCODE_LOCKER_TOKEN=%s\n" "change-this-token" > /etc/shortcode-locker.env'
 sudo systemctl restart shortcode-locker
 ```
 
 ## NixOS sketch with uv
 
-If you move to NixOS, keep this repo in `/srv/shortcode_locker` and add something like:
+If you move to NixOS, keep this repo in `/srv/shortcode-locker` and add something like:
 
 ```nix
 { pkgs, ... }:
@@ -203,24 +203,24 @@ If you move to NixOS, keep this repo in `/srv/shortcode_locker` and add somethin
   };
 
   systemd.services.shortcode-locker = {
-    description = "shortcode_locker: tiny 3-character shortcut/string resolver";
+    description = "shortcode-locker: tiny 3-character shortcut/string resolver";
     wantedBy = [ "multi-user.target" ];
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
     serviceConfig = {
       User = "shortcode-locker";
       Group = "shortcode-locker";
-      StateDirectory = "shortcode_locker";
-      WorkingDirectory = "/srv/shortcode_locker";
+      StateDirectory = "shortcode-locker";
+      WorkingDirectory = "/srv/shortcode-locker";
       Environment = [
-        "SHORTCODE_LOCKER_DATA=/var/lib/shortcode_locker/codes.json"
-        "UV_PROJECT_ENVIRONMENT=/var/lib/shortcode_locker/.venv"
-        "UV_CACHE_DIR=/var/lib/shortcode_locker/.uv-cache"
+        "SHORTCODE_LOCKER_DATA=/var/lib/shortcode-locker/codes.json"
+        "UV_PROJECT_ENVIRONMENT=/var/lib/shortcode-locker/.venv"
+        "UV_CACHE_DIR=/var/lib/shortcode-locker/.uv-cache"
         "PORT=8765"
       ];
-      EnvironmentFile = "-/etc/shortcode_locker.env";
-      ExecStartPre = "${pkgs.uv}/bin/uv sync --directory /srv/shortcode_locker --frozen --no-dev";
-      ExecStart = "${pkgs.uv}/bin/uv run --directory /srv/shortcode_locker --frozen shortcode-locker serve --host 0.0.0.0";
+      EnvironmentFile = "-/etc/shortcode-locker.env";
+      ExecStartPre = "${pkgs.uv}/bin/uv sync --directory /srv/shortcode-locker --frozen --no-dev";
+      ExecStart = "${pkgs.uv}/bin/uv run --directory /srv/shortcode-locker --frozen shortcode-locker serve --host 0.0.0.0";
       Restart = "on-failure";
       NoNewPrivileges = true;
     };
@@ -233,9 +233,9 @@ If you move to NixOS, keep this repo in `/srv/shortcode_locker` and add somethin
 Initialize the data file once:
 
 ```bash
-sudo mkdir -p /var/lib/shortcode_locker
-sudo cp /srv/shortcode_locker/data/codes.json /var/lib/shortcode_locker/codes.json
-sudo cp /srv/shortcode_locker/data/config.json /var/lib/shortcode_locker/config.json
+sudo mkdir -p /var/lib/shortcode-locker
+sudo cp /srv/shortcode-locker/data/codes.json /var/lib/shortcode-locker/codes.json
+sudo cp /srv/shortcode-locker/data/config.json /var/lib/shortcode-locker/config.json
 ```
 
 ## Development

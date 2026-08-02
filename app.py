@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-APP_NAME = "shortcode_locker"
+APP_NAME = "shortcode-locker"
 APP_DIR = Path(__file__).resolve().parent
 DEFAULT_DATA_PATH = APP_DIR / "data" / "codes.json"
 

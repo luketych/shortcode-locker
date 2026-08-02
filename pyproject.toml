@@ -1,5 +1,5 @@
 [project]
-name = "shortcode_locker"
+name = "shortcode-locker"
 version = "0.1.0"
 description = "Tiny 3-character shortcut/string resolver for a ZimaBoard"
 readme = "README.md"
@@ -8,7 +8,6 @@ dependencies = []
 
 [project.scripts]
 shortcode-locker = "app:main"
-shortcode_locker = "app:main"
 
 [build-system]
 requires = ["setuptools>=61"]

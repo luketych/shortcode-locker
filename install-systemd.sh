@@ -7,11 +7,11 @@ if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
 fi
 
 SRC_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-APP_DIR="/opt/shortcode_locker"
-DATA_DIR="/var/lib/shortcode_locker"
+APP_DIR="/opt/shortcode-locker"
+DATA_DIR="/var/lib/shortcode-locker"
 SERVICE_USER="shortcode-locker"
 SERVICE_NAME="shortcode-locker"
-ENV_FILE="/etc/shortcode_locker.env"
+ENV_FILE="/etc/shortcode-locker.env"
 
 if ! command -v uv >/dev/null 2>&1; then
   echo "uv is required. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2

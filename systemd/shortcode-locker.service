@@ -1,5 +1,5 @@
 [Unit]
-Description=shortcode_locker: tiny 3-character shortcut/string resolver
+Description=shortcode-locker: tiny 3-character shortcut/string resolver
 After=network-online.target
 Wants=network-online.target
 
@@ -7,19 +7,19 @@ Wants=network-online.target
 Type=simple
 User=shortcode-locker
 Group=shortcode-locker
-WorkingDirectory=/opt/shortcode_locker
+WorkingDirectory=/opt/shortcode-locker
 Environment=HOST=0.0.0.0
 Environment=PORT=8765
-Environment=SHORTCODE_LOCKER_DATA=/var/lib/shortcode_locker/codes.json
-EnvironmentFile=-/etc/shortcode_locker.env
-ExecStart=/opt/shortcode_locker/.venv/bin/shortcode-locker serve
+Environment=SHORTCODE_LOCKER_DATA=/var/lib/shortcode-locker/codes.json
+EnvironmentFile=-/etc/shortcode-locker.env
+ExecStart=/opt/shortcode-locker/.venv/bin/shortcode-locker serve
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/var/lib/shortcode_locker
+ReadWritePaths=/var/lib/shortcode-locker
 
 [Install]
 WantedBy=multi-user.target
